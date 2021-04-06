@@ -85,20 +85,20 @@ class GitUtilTest {
     }
 
     @Test
-    void tag_pointsAt_emptyRepo() throws GitAPIException, IOException {
+    void tagsPointAt_emptyRepo() throws GitAPIException, IOException {
 
         // given
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
 
         // when
-        List<String> tags = GitUtil.tag_pointsAt(git.getRepository(), HEAD);
+        List<String> tags = GitUtil.tagsPointAt(git.getRepository(), HEAD);
 
         // then
         assertThat(tags).isEmpty();
     }
 
     @Test
-    void tag_pointsAt_noTags() throws GitAPIException, IOException {
+    void tagsPointAt_noTags() throws GitAPIException, IOException {
 
         // given
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
@@ -106,14 +106,14 @@ class GitUtilTest {
         git.commit().setMessage("initial commit").setAllowEmpty(true).call();
 
         // when
-        List<String> tags = GitUtil.tag_pointsAt(git.getRepository(), HEAD);
+        List<String> tags = GitUtil.tagsPointAt(git.getRepository(), HEAD);
 
         // then
         assertThat(tags).isEmpty();
     }
 
     @Test
-    void tag_pointsAt_oneTag() throws GitAPIException, IOException {
+    void tagsPointAt_oneTag() throws GitAPIException, IOException {
 
         // given
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
@@ -123,14 +123,14 @@ class GitUtilTest {
         git.tag().setName(givenTagName).setObjectId(givenCommit).call();
 
         // when
-        List<String> tags = GitUtil.tag_pointsAt(git.getRepository(), HEAD);
+        List<String> tags = GitUtil.tagsPointAt(git.getRepository(), HEAD);
 
         // then
         assertThat(tags).containsExactly(givenTagName);
     }
 
     @Test
-    void tag_pointsAt_multipleTags() throws GitAPIException, IOException {
+    void tagsPointAt_multipleTags() throws GitAPIException, IOException {
 
         // given
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
@@ -144,14 +144,14 @@ class GitUtilTest {
         git.tag().setName(givenTagName3).setObjectId(givenCommit).call();
 
         // when
-        List<String> tags = GitUtil.tag_pointsAt(git.getRepository(), HEAD);
+        List<String> tags = GitUtil.tagsPointAt(git.getRepository(), HEAD);
 
         // then
         assertThat(tags).containsExactlyInAnyOrder(givenTagName1, givenTagName2, givenTagName3);
     }
 
     @Test
-    void tag_pointsAt_lightweightTag() throws GitAPIException, IOException {
+    void tagsPointAt_lightweightTag() throws GitAPIException, IOException {
 
         // given
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
@@ -162,7 +162,7 @@ class GitUtilTest {
         git.tag().setName(givenTagName).setAnnotated(false).setObjectId(givenCommit).call();
 
         // when
-        List<String> tags = GitUtil.tag_pointsAt(git.getRepository(), HEAD);
+        List<String> tags = GitUtil.tagsPointAt(git.getRepository(), HEAD);
 
         // then
         assertThat(tags).containsExactlyInAnyOrder(givenTagName);
