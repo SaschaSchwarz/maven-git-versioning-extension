@@ -5,7 +5,7 @@ import com.google.inject.Key;
 import com.google.inject.OutOfScopeException;
 import de.pdark.decentxml.Document;
 import de.pdark.decentxml.Element;
-import me.qoomon.gitversioning.commons.GitSituation;
+import me.qoomon.gitversioning.commons.GitHeadSituation;
 import me.qoomon.gitversioning.commons.GitUtil;
 import me.qoomon.maven.gitversioning.Configuration.PropertyDescription;
 import me.qoomon.maven.gitversioning.Configuration.VersionDescription;
@@ -16,6 +16,8 @@ import org.apache.maven.model.*;
 import org.apache.maven.model.building.DefaultModelProcessor;
 import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.session.scope.internal.SessionScope;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.slf4j.Logger;
 
 import javax.enterprise.inject.Typed;
@@ -29,6 +31,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.regex.Pattern;
 
 import static java.lang.Boolean.parseBoolean;
 import static java.lang.Math.*;
@@ -83,7 +86,7 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
 
     private MavenSession mavenSession; // can't be injected, cause it's not available before model read
     private File mvnDirectory;
-    private GitSituation gitSituation;
+    private GitHeadSituation gitHeadSituation;
 
     private boolean disabled = false;
     private boolean updatePomOption = false;
@@ -160,23 +163,23 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         }
 
         // determine git situation
-        gitSituation = getGitSituation(executionRootDirectory);
-        if (gitSituation == null) {
+        gitHeadSituation = getGitHeadSituation(executionRootDirectory);
+        if (gitHeadSituation == null) {
             logger.warn("skip - project is not part of a git repository");
             disabled = true;
             return;
         }
         logger.debug(buffer().strong("git situation:").toString());
-        logger.debug("  root directory: " + gitSituation.getRootDirectory());
-        logger.debug("  head commit: " + gitSituation.getHeadCommit());
-        logger.debug("  head commit timestamp: " + gitSituation.getHeadCommitTimestamp());
-        logger.debug("  head branch: " + gitSituation.getHeadBranch());
-        logger.debug("  head tags: " + gitSituation.getHeadTags());
+        logger.debug("  root directory: " + gitHeadSituation.getRootDirectory());
+        logger.debug("  head commit: " + gitHeadSituation.getHeadCommit());
+        logger.debug("  head commit timestamp: " + gitHeadSituation.getHeadCommitTimestamp());
+        logger.debug("  head branch: " + gitHeadSituation.getHeadBranch());
+        logger.debug("  head tags: " + gitHeadSituation.getHeadTags());
 
         // determine git version details
         boolean preferTagsOption = getPreferTagsOption(config);
         logger.debug(buffer().strong("option:").toString() + " prefer tags: " + preferTagsOption);
-        gitVersionDetails = getGitVersionDetails(gitSituation, config, preferTagsOption);
+        gitVersionDetails = getGitVersionDetails(gitHeadSituation, config, preferTagsOption);
         logger.info("git ref: " + buffer().strong(gitVersionDetails.getRefName())
                 + " (" + gitVersionDetails.getRefType().name().toLowerCase() + ")");
         gitVersioningPropertyDescriptionMap = gitVersionDetails.getConfig().property.stream()
@@ -193,8 +196,8 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         // add session root project as initial module
         projectModules.add(projectModel.getPomFile());
 
-        globalFormatPlaceholderMap = generateGlobalFormatPlaceholderMap(gitSituation, gitVersionDetails, mavenSession);
-        gitProjectProperties = generateGitProjectProperties(gitSituation, gitVersionDetails);
+        globalFormatPlaceholderMap = generateGlobalFormatPlaceholderMap(gitHeadSituation, gitVersionDetails, mavenSession);
+        gitProjectProperties = generateGitProjectProperties(gitHeadSituation, gitVersionDetails);
 
         logger.info("");
     }
@@ -472,37 +475,38 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
 
     // ---- versioning -------------------------------------------------------------------------------------------------
 
-    private GitSituation getGitSituation(File executionRootDirectory) throws IOException {
-        GitSituation gitSituation = GitUtil.situation(executionRootDirectory);
-        if (gitSituation == null) {
+    private GitHeadSituation getGitHeadSituation(File executionRootDirectory) throws IOException {
+        Repository repository = new FileRepositoryBuilder().findGitDir(executionRootDirectory).build();
+        if (repository.getWorkTree() == null) {
             return null;
         }
+
+        GitHeadSituation gitHeadSituation = new GitHeadSituation(repository, Pattern.compile(".*")); // TODO
+
         String providedTag = getCommandOption(OPTION_NAME_GIT_TAG);
         if (providedTag != null) {
             logger.debug("set git head tag by command option: " + providedTag);
-            gitSituation = GitSituation.Builder.of(gitSituation)
-                    .setHeadBranch(null)
-                    .setHeadTags(providedTag.isEmpty() ? emptyList() : singletonList(providedTag))
-                    .build();
+            gitHeadSituation.setBranch(null);
+            gitHeadSituation.setTags(providedTag.isEmpty() ? emptyList() : singletonList(providedTag));
         }
         String providedBranch = getCommandOption(OPTION_NAME_GIT_BRANCH);
         if (providedBranch != null) {
             logger.debug("set git head branch by command option: " + providedBranch);
-            gitSituation = GitSituation.Builder.of(gitSituation)
+            gitHeadSituation = gitHeadSituation.Builder.of(gitHeadSituation)
                     .setHeadBranch(providedBranch)
                     .build();
         }
 
-        return gitSituation;
+        return gitHeadSituation;
     }
 
-    private static GitVersionDetails getGitVersionDetails(GitSituation gitSituation, Configuration config, boolean preferTags) {
-        String headCommit = gitSituation.getHeadCommit();
+    private static GitVersionDetails getGitVersionDetails(GitHeadSituation GitHeadSituation, Configuration config, boolean preferTags) {
+        String headCommit = GitHeadSituation.getHeadCommit();
 
         // detached tag
-        if (!gitSituation.getHeadTags().isEmpty() && (gitSituation.isDetached() || preferTags)) {
+        if (GitHeadSituation.isDetached() || preferTags) {
             // sort tags by maven version logic
-            List<String> sortedHeadTags = gitSituation.getHeadTags().stream()
+            List<String> sortedHeadTags = GitHeadSituation.getHeadTags().stream()
                     .sorted(comparing(DefaultArtifactVersion::new)).collect(toList());
             for (VersionDescription tagConfig : config.tag) {
                 for (String headTag : sortedHeadTags) {
@@ -514,7 +518,7 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         }
 
         // detached commit
-        if (gitSituation.isDetached()) {
+        if (GitHeadSituation.isDetached()) {
             if (config.commit != null) {
                 if (config.commit.pattern == null || headCommit.matches(config.commit.pattern)) {
                     return new GitVersionDetails(headCommit, COMMIT, headCommit, config.commit);
@@ -529,7 +533,7 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
 
         // branch
         {
-            String headBranch = gitSituation.getHeadBranch();
+            String headBranch = GitHeadSituation.getHeadBranch();
             for (VersionDescription branchConfig : config.branch) {
                 if (branchConfig.pattern == null || headBranch.matches(branchConfig.pattern)) {
                     return new GitVersionDetails(headCommit, BRANCH, headBranch, branchConfig);
@@ -567,14 +571,14 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         return placeholderMap;
     }
 
-    private static Map<String, String> generateGlobalFormatPlaceholderMap(GitSituation gitSituation, GitVersionDetails gitVersionDetails, MavenSession mavenSession) {
+    private static Map<String, String> generateGlobalFormatPlaceholderMap(GitHeadSituation GitHeadSituation, GitVersionDetails gitVersionDetails, MavenSession mavenSession) {
         final Map<String, String> placeholderMap = new HashMap<>();
 
-        String headCommit = gitSituation.getHeadCommit();
+        String headCommit = GitHeadSituation.getHeadCommit();
         placeholderMap.put("commit", headCommit);
         placeholderMap.put("commit.short", headCommit.substring(0, 7));
 
-        ZonedDateTime headCommitDateTime = gitSituation.getHeadCommitDateTime();
+        ZonedDateTime headCommitDateTime = GitHeadSituation.getHeadCommitDateTime();
         placeholderMap.put("commit.timestamp", String.valueOf(headCommitDateTime.toEpochSecond()));
         placeholderMap.put("commit.timestamp.year", String.valueOf(headCommitDateTime.getYear()));
         placeholderMap.put("commit.timestamp.month", leftPad(String.valueOf(headCommitDateTime.getMonthValue()), 2, "0"));
@@ -600,8 +604,8 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
                     .collect(toMap(entry -> entry.getKey() + ".slug", entry -> slugify(entry.getValue()))));
         }
 
-        placeholderMap.put("dirty", !gitSituation.isClean() ? "-DIRTY" : "");
-        placeholderMap.put("dirty.snapshot", !gitSituation.isClean() ? "-SNAPSHOT" : "");
+        placeholderMap.put("dirty", !GitHeadSituation.isClean() ? "-DIRTY" : "");
+        placeholderMap.put("dirty.snapshot", !GitHeadSituation.isClean() ? "-SNAPSHOT" : "");
 
         // command parameters e.g. mvn -Dfoo=123 will be available as ${foo}
         mavenSession.getUserProperties().forEach((key, value) -> placeholderMap.put((String) key, (String) value));
@@ -620,12 +624,12 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         return placeholderMap;
     }
 
-    private static Map<String, String> generateGitProjectProperties(GitSituation gitSituation, GitVersionDetails gitVersionDetails) {
+    private static Map<String, String> generateGitProjectProperties(GitHeadSituation GitHeadSituation, GitVersionDetails gitVersionDetails) {
         Map<String, String> properties = new HashMap<>();
 
         properties.put("git.commit", gitVersionDetails.getCommit());
 
-        ZonedDateTime headCommitDateTime = gitSituation.getHeadCommitDateTime();
+        ZonedDateTime headCommitDateTime = GitHeadSituation.getHeadCommitDateTime();
         properties.put("git.commit.timestamp", String.valueOf(headCommitDateTime.toEpochSecond()));
         properties.put("git.commit.timestamp.datetime", headCommitDateTime.toEpochSecond() > 0
                 ? headCommitDateTime.format(ISO_INSTANT) : "0000-00-00T00:00:00Z");
@@ -638,7 +642,7 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
         properties.put("git." + refTypeName, refName);
         properties.put("git." + refTypeName + ".slug", refNameSlug);
 
-        properties.put("git.dirty", Boolean.toString(!gitSituation.isClean()));
+        properties.put("git.dirty", Boolean.toString(!GitHeadSituation.isClean()));
 
         return properties;
     }
@@ -785,7 +789,7 @@ public class GitVersioningModelProcessor extends DefaultModelProcessor {
                 && pomFile.getName().endsWith(".xml")
                 && pomFile.getCanonicalPath().startsWith(mvnDirectory.getParentFile().getCanonicalPath() + File.separator)
                 // only pom files within git directory are treated as project pom files
-                && pomFile.getCanonicalPath().startsWith(gitSituation.getRootDirectory().getCanonicalPath() + File.separator);
+                && pomFile.getCanonicalPath().startsWith(gitHeadSituation.getRootDirectory().getCanonicalPath() + File.separator);
     }
 
     private Model searchParentProjectInParentDirectory(Model projectModel) throws IOException {

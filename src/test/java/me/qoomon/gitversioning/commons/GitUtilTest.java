@@ -203,10 +203,10 @@ class GitUtilTest {
         Git git = Git.init().setInitialBranch("master").setDirectory(tempDir.toFile()).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(git.getRepository().getDirectory());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(git.getRepository().getDirectory());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(NO_COMMIT);
             softly.assertThat(it.getHeadBranch()).isEqualTo(MASTER);
@@ -222,10 +222,10 @@ class GitUtilTest {
         RevCommit givenCommit = git.commit().setMessage("init").setAllowEmpty(true).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(git.getRepository().getDirectory());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(git.getRepository().getDirectory());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isEqualTo(MASTER);
@@ -243,10 +243,10 @@ class GitUtilTest {
         git.tag().setName(givenTag).setObjectId(givenCommit).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(git.getRepository().getDirectory());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(git.getRepository().getDirectory());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isEqualTo(MASTER);
@@ -263,10 +263,10 @@ class GitUtilTest {
         git.checkout().setName(givenCommit.getName()).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(git.getRepository().getDirectory());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(git.getRepository().getDirectory());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isNull();
@@ -285,10 +285,10 @@ class GitUtilTest {
         git.checkout().setName(givenTag).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(git.getRepository().getDirectory());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(git.getRepository().getDirectory());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isNull();
@@ -307,10 +307,10 @@ class GitUtilTest {
         git.tag().setAnnotated(true).setName(givenTag).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(tempDir.toFile());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(tempDir.toFile());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isEqualTo("master");
@@ -330,10 +330,10 @@ class GitUtilTest {
         git.checkout().setName(givenTag).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(tempDir.toFile());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(tempDir.toFile());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isNull();
@@ -352,10 +352,10 @@ class GitUtilTest {
         git.tag().setAnnotated(false).setName(givenTag).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(tempDir.toFile());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(tempDir.toFile());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isEqualTo("master");
@@ -375,10 +375,10 @@ class GitUtilTest {
         git.checkout().setName(givenTag).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(tempDir.toFile());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(tempDir.toFile());
 
         // Then
-        assertThat(gitSituation).satisfies(it -> assertSoftly(softly -> {
+        assertThat(GitHeadSituation).satisfies(it -> assertSoftly(softly -> {
             softly.assertThat(it.isClean()).isTrue();
             softly.assertThat(it.getHeadCommit()).isEqualTo(givenCommit.getName());
             softly.assertThat(it.getHeadBranch()).isNull();
@@ -401,11 +401,11 @@ class GitUtilTest {
         git.tag().setAnnotated(false).setName(givenTag3).call();
 
         // When
-        GitSituation gitSituation = GitUtil.situation(tempDir.toFile());
+        GitHeadSituation GitHeadSituation = GitUtil.situation(tempDir.toFile());
 
         // Then
         // expect tags to be sorted alphanumerically
         List<String> expectedTags = Arrays.asList(givenTag2, givenTag1, givenTag3);
-        assertThat(gitSituation.getHeadTags()).isEqualTo(expectedTags);
+        assertThat(GitHeadSituation.getHeadTags()).isEqualTo(expectedTags);
     }
 }
